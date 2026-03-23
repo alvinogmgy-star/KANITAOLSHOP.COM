@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanita Olshop - System</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.10.0/firebase-database-compat.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    
+    <style>
+        :root { --pink-dark: #ff4d94; --pink-mid: #ffb3d1; --pink-light: #fff0f5; }
+        body { font-family: 'Poppins', sans-serif; background: var(--pink-light); margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; }
+        .container { width: 100%; max-width: 450px; background: white; border-radius: 25px; padding: 25px; box-shadow: 0 10px 30px rgba(255, 77, 148, 0.1); align-self: flex-start; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px dashed var(--pink-mid); padding-bottom: 15px; }
+        .header h1 { color: var(--pink-dark); margin: 0; font-size: 22px; }
+        .section { display: none; animation: fadeIn 0.4s; }
+        .active { display: block; }
+        .card { background: #fff9fb; border-radius: 15px; padding: 15px; margin-bottom: 15px; border: 1px solid var(--pink-mid); }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 2px solid #eee; border-radius: 10px; box-sizing: border-box; outline: none; }
+        button { width: 100%; padding: 14px; background: var(--pink-dark); color: white; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 8px; transition: 0.2s; }
+        button:active { transform: scale(0.97); }
+        .btn-gray { background: #999; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th { text-align: left; color: #888; font-size: 11px; padding-bottom: 8px; }
+        td { padding: 12px 8px; border-bottom: 1px solid #eee; }
+        tr:hover { background: var(--pink-light); cursor: pointer; }
+        .badge-koin { background: var(--pink-dark); color: white; padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>🌸 KANITA OLSHOP</h1>
+        <p style="font-size: 11px; color: #888; margin: 5px 0 0 0;">Digital Loyalty Card</p>
+    </div>
+
+    <div id="pg-auth" class="section active">
+        <div class="card">
+            <h4 style="margin: 0 0 10px 0; color: var(--pink-dark);">Registrasi Member</h4>
+            <input type="text" id="reg-nama" placeholder="Nama Lengkap">
+            <input type="number" id="reg-phone" placeholder="No. WhatsApp (628...)">
+            <button onclick="handleDaftar()">Daftar & Masuk ✨</button>
+        </div>
+        <button style="background: var(--pink-mid); color: var(--pink-dark);" onclick="aksesOwner()">Login Penjual 🔑</button>
+    </div>
+
+    <div id="pg-buyer" class="section">
+        <div style="text-align: center; background: var(--pink-dark); color: white; padding: 25px; border-radius: 20px;">
+            <p style="margin:0; opacity: 0.8; font-size: 13px;">Koin Anda:</p>
+            <h1 id="view-koin" style="font-size: 55px; margin: 5px 0;">0</h1>
+            <p id="view-nama" style="font-weight: 600; font-size: 18px; margin: 0;"></p>
+        </div>
+        <div class="card" style="margin-top: 15px; text-align: center;">
+            <p style="font-size: 12px; color: #666; margin: 0;">Berikan nomor HP Anda ke kasir setiap belanja untuk menambah koin!</p>
+        </div>
+        <button class="btn-gray" onclick="location.reload()">Keluar</button>
+    </div>
+
+    <div id="pg-owner" class="section">
+        <h3 style="color: var(--pink-dark); margin-top: 0;">Panel Penjual</h3>
+        
+        <div class="card">
+            <p style="margin: 0 0 10px 0; font-weight: 600;">Input Koin Member:</p>
+            <input type="text" id="target-nama" readonly placeholder="Klik nama di tabel bawah">
+            <input type="hidden" id="target-phone">
+            <input type="number" id="nominal-rp" placeholder="Nominal Belanja (Rp)">
+            <button onclick="prosesTambahKoin()">Update Koin (Rp1rb = 1 Koin)</button>
+        </div>
+
+        <h4 style="margin: 20px 0 10px 0;">Statistik Member</h4>
+        <div style="max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px;">
+            <table>
+                <thead><tr><th>Nama</th><th>Koin</th></tr></thead>
+                <tbody id="list-member"></tbody>
+            </table>
+        </div>
+
+        <div class="card" style="margin-top: 20px; text-align: center;">
+            <p style="margin: 0 0 10px 0;"><b>QR Pendaftaran Toko</b></p>
+            <div id="qrcode" style="display: inline-block; padding: 10px; background: white;"></div><br>
+            <button style="background: #555; font-size: 12px; width: auto; padding: 8px 15px;" onclick="unduhQR()">Unduh Gambar QR</button>
+        </div>
+        <button class="btn-gray" onclick="location.reload()">Tutup Panel</button>
+    </div>
+</div>
+
+<script>
+    // --- CONFIGURASI FIREBASE ANDA ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAgjf6QK_ATv2oXWVqf9XVUmHuYjK_Tyv8",
+        authDomain: "kanitaolshop-ef451.firebaseapp.com",
+        projectId: "kanitaolshop-ef451",
+        databaseURL: "https://kanitaolshop-ef451-default-rtdb.firebaseio.com", // Link Database Anda
+        storageBucket: "kanitaolshop-ef451.firebasestorage.app",
+        messagingSenderId: "99142729071",
+        appId: "1:99142729071:web:95be924a7af91564c47c9a"
+    };
+
+    // Inisialisasi Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- FUNGSI PEMBELI ---
+    function handleDaftar() {
+        const nama = document.getElementById('reg-nama').value;
+        const phone = document.getElementById('reg-phone').value;
+        if(!nama || !phone) return alert("Lengkapi data!");
+
+        const userRef = db.ref('users/' + phone);
+        userRef.once('value', (snap) => {
+            if(!snap.exists()) {
+                userRef.set({ nama: nama, phone: phone, coins: 0 });
+            }
+            // Pantau koin secara langsung
+            db.ref('users/' + phone).on('value', (s) => {
+                const d = s.val();
+                if(d) {
+                    document.getElementById('view-nama').innerText = d.nama;
+                    document.getElementById('view-koin').innerText = d.coins;
+                    showPage('pg-buyer');
+                }
+            });
+        });
+    }
+
+    // --- FUNGSI PENJUAL ---
+    function aksesOwner() {
+        if(prompt("Password Pemilik:") === "KANITATHENDY29062009") {
+            showPage('pg-owner');
+            generateQR();
+            db.ref('users').on('value', (snap) => {
+                const list = document.getElementById('list-member');
+                list.innerHTML = "";
+                const data = snap.val();
+                for(let id in data) {
+                    list.innerHTML += `<tr onclick="pilihMember('${data[id].phone}', '${data[id].nama}')">
+                        <td><b>${data[id].nama}</b><br><small>${data[id].phone}</small></td>
+                        <td><span class="badge-koin">${data[id].coins}</span></td>
+                    </tr>`;
+                }
+            });
+        }
+    }
+
+    function pilihMember(phone, nama) {
+        document.getElementById('target-phone').value = phone;
+        document.getElementById('target-nama').value = nama;
+        document.getElementById('nominal-rp').focus();
+    }
+
+    function prosesTambahKoin() {
+        const phone = document.getElementById('target-phone').value;
+        const rp = document.getElementById('nominal-rp').value;
+        if(!phone || !rp) return alert("Klik nama member di tabel & isi nominal!");
+
+        const koinBaru = Math.floor(rp / 1000);
+        db.ref('users/' + phone + '/coins').transaction((current) => (current || 0) + koinBaru);
+        
+        alert("Koin berhasil ditambahkan!");
+        document.getElementById('nominal-rp').value = "";
+    }
+
+    // --- UTILS ---
+    function generateQR() {
+        document.getElementById("qrcode").innerHTML = "";
+        new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 140, height: 140, colorDark: "#ff4d94" });
+    }
+
+    function unduhQR() {
+        const canvas = document.querySelector("#qrcode canvas");
+        if(!canvas) return alert("Buka Panel Penjual dulu!");
+        const a = document.createElement('a');
+        a.download = 'QR_KanitaOlshop.png';
+        a.href = canvas.toDataURL();
+        a.click();
+    }
+
+    function showPage(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+</script>
+
+</body>
+</html> 
