@@ -44,15 +44,15 @@
         <p style="font-size: 10px; color: #ccc; margin: 0;">MEMBERSHIP DIGITAL</p>
     </div>
 
-    <div id="loader">Menghubungkan ke Server... ✨</div>
+    <div id="loader">Sedang Memproses... ✨</div>
 
     <div id="pg-auth" class="section active">
         <div class="card">
             <label style="font-size: 11px; font-weight: 600; color: #888;">NAMA LENGKAP</label>
-            <input type="text" id="reg-nama" placeholder="Sesuai WhatsApp">
+            <input type="text" id="reg-nama" placeholder="Contoh: Siti">
             <label style="font-size: 11px; font-weight: 600; color: #888;">NOMOR WHATSAPP</label>
             <input type="number" id="reg-phone" placeholder="Contoh: 62812345678">
-            <button onclick="handleAuth()">Masuk & Cek Koin</button>
+            <button id="btn-login" onclick="handleAuth()">Masuk & Cek Koin ✨</button>
         </div>
         <button class="btn-secondary" onclick="aksesAdmin()">Panel Penjual 🔑</button>
     </div>
@@ -97,48 +97,56 @@
             <label style="font-size: 11px;">NOMINAL BELANJA (RP)</label>
             <input type="number" id="nominal-rp" placeholder="Contoh: 100000">
             <div style="background: #fff9fb; padding: 10px; border-radius: 10px; font-size: 12px; color: #d63384; margin-bottom: 15px; text-align: center;">
-                Hasil: <b id="pre-val">0</b> Koin & <b id="pre-per">0</b> Perak
+                Menjadi: <b id="pre-val">0</b> Koin & <b id="pre-per">0</b> Perak
             </div>
-            <button onclick="simpanKoin()">Update Koin & Kembali</button>
+            <button onclick="simpanKoin()">Konfirmasi & Simpan</button>
             <button class="btn-secondary" onclick="showPage('pg-admin')">Batal</button>
         </div>
     </div>
 </div>
 
 <script>
-    // Konfigurasi dengan HTTPS (Penting untuk GitHub Pages)
+    // --- FIREBASE CONFIG (HTTPS WAJIB) ---
     const firebaseConfig = {
         apiKey: "AIzaSyAgjf6QK_ATv2oXWVqf9XVUmHuYjK_Tyv8",
         authDomain: "kanitaolshop-ef451.firebaseapp.com",
         projectId: "kanitaolshop-ef451",
         databaseURL: "https://kanitaolshop-ef451-default-rtdb.firebaseio.com",
-        storageBucket: "kanitaolshop-ef451.appspot.com",
+        storageBucket: "kanitaolshop-ef451.firebasestorage.app",
         messagingSenderId: "99142729071",
         appId: "1:99142729071:web:95be924a7af91564c47c9a"
     };
 
-    // Jalankan Firebase
+    // Inisialisasi
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
     let currentTargetPhone = "";
 
-    // Live Konversi (Rp10.000 = 10 Koin)
+    // Live Preview Konversi
     document.getElementById('nominal-rp').addEventListener('input', (e) => {
         let val = Math.floor(e.target.value / 1000);
         document.getElementById('pre-val').innerText = val;
         document.getElementById('pre-per').innerText = val;
     });
 
-    // Masuk Sebagai Pembeli
-    function handleAuth() {
+    // Login/Daftar
+    async function handleAuth() {
         const nama = document.getElementById('reg-nama').value.trim();
         const phone = document.getElementById('reg-phone').value.trim();
-        if(!nama || phone.length < 10) return alert("Data tidak lengkap!");
+        
+        if(!nama || phone.length < 10) return alert("Data Nama/WhatsApp tidak benar!");
         
         toggleLoading(true);
         const userRef = db.ref('users/' + phone);
         
+        // Timeout check jika stuck
+        let timeout = setTimeout(() => {
+            toggleLoading(false);
+            alert("Koneksi Firebase Lemot. Pastikan Rules di Firebase sudah TRUE.");
+        }, 10000);
+
         userRef.on('value', snap => {
+            clearTimeout(timeout);
             const data = snap.val();
             if(data) {
                 document.getElementById('view-nama').innerText = data.nama;
@@ -151,24 +159,24 @@
         });
     }
 
-    // Masuk Sebagai Penjual
+    // Fungsi Admin & Navigasi
     function aksesAdmin() {
         const pw = prompt("Password Penjual:");
         if(pw === "KANITATHENDY29062009") {
             showPage('pg-admin');
             renderStatistik();
             generateQR();
-        } else if(pw !== null) alert("Akses Ditolak!");
+        } else if(pw !== null) alert("Password Salah!");
     }
 
     function renderStatistik() {
         db.ref('users').on('value', snap => {
             const list = document.getElementById('list-statistik');
             list.innerHTML = "";
-            let arr = [];
-            snap.forEach(c => arr.push(c.val()));
-            arr.sort((a,b) => (b.coins || 0) - (a.coins || 0));
-            arr.forEach(m => {
+            let dataArr = [];
+            snap.forEach(c => dataArr.push(c.val()));
+            dataArr.sort((a,b) => (b.coins || 0) - (a.coins || 0));
+            dataArr.forEach(m => {
                 list.innerHTML += `
                     <tr onclick="bukaKonversi('${m.phone}', '${m.nama}')">
                         <td><b>${m.nama}</b><br><small>${m.phone}</small></td>
@@ -192,27 +200,29 @@
         const bonus = Math.floor(rp / 1000);
         db.ref('users/' + currentTargetPhone + '/coins').transaction(c => (c || 0) + bonus)
         .then(() => {
-            alert("Berhasil Diupdate!");
+            alert("Berhasil!");
             showPage('pg-admin');
         });
     }
 
-    // Fungsi Navigasi & UI
     function showPage(id) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         window.scrollTo(0,0);
     }
+
     function toggleLoading(show) {
         document.getElementById('loader').style.display = show ? 'block' : 'none';
     }
+
     function generateQR() {
         const q = document.getElementById("qrcode"); q.innerHTML = "";
         new QRCode(q, { text: window.location.href, width: 120, height: 120, colorDark: "#ff4d94" });
     }
+
     function unduhQR() {
         const c = document.querySelector("#qrcode canvas");
-        if(c) { const l = document.createElement('a'); l.download = 'QR_Kanita.png'; l.href = c.toDataURL(); l.click(); }
+        if(c) { const l = document.createElement('a'); l.download = 'QR.png'; l.href = c.toDataURL(); l.click(); }
     }
 </script>
 
